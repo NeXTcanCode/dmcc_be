@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+package-lock.json
+
+# env
+.env
+
+# runtime data
+data/
+
+# os
+.DS_Store
+
+*.md
