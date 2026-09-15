@@ -52,14 +52,58 @@ router.get('/stations/:code', proxyWithFallback(
 
 // Fare planning is combinatorial and not snapshot; it stays live-only.
 // The fare flow (externalFareService) already falls back to local slab calc.
+//
+// Upstream's /new_fare_with_route shape (stations, weekday_fare/weekend_fare,
+// route[{line, start, end, path, path_time}]) doesn't match what the
+// frontend renders (station_count, fare.applicable/normal, legs[], total_distance_km),
+// so it's normalized here rather than passed through raw.
 router.get('/journeys/plan', async (req, res) => {
   const strategy = req.query.strategy === 'minimum-interchange'
     ? 'minimum-interchange' : 'least-distance';
   const from = req.query.from || '';
   const to = req.query.to || '';
   try {
-    const data = await fetchMetroApi(`/new_fare_with_route/${encodeURIComponent(from)}/${encodeURIComponent(to)}/${strategy}/`);
-    return res.json(data);
+    const [data, lines] = await Promise.all([
+      fetchMetroApi(`/new_fare_with_route/${encodeURIComponent(from)}/${encodeURIComponent(to)}/${strategy}/`),
+      fetchMetroApi('/line_list').catch(() => fallbackLines()),
+    ]);
+
+    const colorByLineLabel = Object.fromEntries(
+      (lines || []).map((l) => [l.line_color, l.primary_color_code])
+    );
+    const route = Array.isArray(data.route) ? data.route : [];
+
+    const legs = route.map((r) => ({
+      line_name: r.line,
+      line_color: colorByLineLabel[r.line] || '#2f6fd6',
+      from_station: r.start,
+      to_station: r.end,
+      station_count: Array.isArray(r.path) ? r.path.length : undefined,
+      duration: r.path_time,
+    }));
+    const interchanges = route.slice(0, -1).map((r) => ({ station: r.end }));
+
+    const isSunday = new Date().getDay() === 0;
+    const fare = {
+      normal: data.weekday_fare,
+      applicable: isSunday ? data.weekend_fare : data.weekday_fare,
+    };
+
+    // Upstream gives no distance figure; estimate from hop count the same
+    // way the Dashboard's manual-entry fallback does (~1.2km/station).
+    const stationCount = data.stations;
+    const totalDistanceKm = Number.isFinite(stationCount)
+      ? Math.max(1, Number(((stationCount - 1) * 1.2).toFixed(1)))
+      : undefined;
+
+    return res.json({
+      ...data,
+      station_count: stationCount,
+      total_distance_km: totalDistanceKm,
+      fare,
+      legs,
+      interchanges,
+    });
   } catch (error) {
     return res.status(502).json({ message: 'Could not reach metro data source', detail: error.message });
   }
