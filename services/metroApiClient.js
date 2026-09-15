@@ -1,11 +1,19 @@
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map();
 
-const BASE_URL = 'https://dmrc-rest-api.vercel.app';
+// Live official DMRC backend (what github.com/tashifkhan/delhi-metro wraps).
+// The previous target, dmrc-rest-api.vercel.app, was a disabled public mirror
+// (HTTP 402 DEPLOYMENT_DISABLED). This official origin is the source of truth
+// and also carries the rich facility data (gates, lifts, timings, phones).
+const BASE_URL = 'https://backend.delhimetrorail.com/api/v2/en';
 
-// Thin proxy over the public dmrc-rest-api (github.com/tashifkhan/delhi-metro),
-// which sends no CORS headers, so the frontend can't call it directly.
-// Throws on failure - callers (routes) decide how to surface that to the client.
+// The upstream serves content to the official site; send its origin + referer.
+const HEADERS = {
+  'Origin': 'https://delhimetrorail.com',
+  'Referer': 'https://delhimetrorail.com/',
+  'Accept': 'application/json',
+};
+
 export const fetchMetroApi = async (path, { cacheable = true } = {}) => {
   const cacheKey = path;
   if (cacheable) {
@@ -17,7 +25,10 @@ export const fetchMetroApi = async (path, { cacheable = true } = {}) => {
   const timer = setTimeout(() => controller.abort(), 8000);
 
   try {
-    const response = await fetch(`${BASE_URL}${path}`, { signal: controller.signal });
+    const response = await fetch(`${BASE_URL}${path}`, {
+      signal: controller.signal,
+      headers: HEADERS,
+    });
     if (!response.ok) {
       const error = new Error(`Upstream metro API returned ${response.status}`);
       error.status = response.status;
