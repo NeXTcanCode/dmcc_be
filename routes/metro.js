@@ -7,6 +7,7 @@ import {
   fallbackStationDetail,
   fallbackStationSearch,
 } from '../services/metroSnapshot.js';
+import { planOfflineJourney } from '../services/metroJourneyPlanner.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -105,6 +106,9 @@ router.get('/journeys/plan', async (req, res) => {
       interchanges,
     });
   } catch (error) {
+    // Offline fallback: reconstruct the journey from the local snapshot.
+    const offline = planOfflineJourney({ fromCode: from, toCode: to, strategy });
+    if (offline) return res.json(offline);
     return res.status(502).json({ message: 'Could not reach metro data source', detail: error.message });
   }
 });
