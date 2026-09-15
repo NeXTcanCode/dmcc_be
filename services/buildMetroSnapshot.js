@@ -29,7 +29,7 @@ try {
 
   const out = './data/metroSnapshot.json';
   writeFileSync(out, JSON.stringify(snapshot));
-  console.log('\nwrote', out, (process.memoryInfo?.()?.rss ?? 0));
+  console.log('\nwrote', out);
 } catch (e) {
   console.error('ERR', e.message);
   process.exit(1);
