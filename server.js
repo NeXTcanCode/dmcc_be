@@ -10,9 +10,15 @@ import metroRoutes from "./routes/metro.js";
 const app = express();
 const port = process.env.PORT || 3000;
 
+const NETLIFY = "https://next-calculates-dmrc-fare.netlify.app";
+const allowedOrigins = [NETLIFY, ...(process.env.CLIENT_ORIGIN || "http://localhost:5173").split(",")];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "https://next-calculates-dmrc-fare.netlify.app",
+    origin: (origin, cb) => {
+      // allow same-origin (curl, health checks) and any allowlisted origin
+      cb(null, !origin || allowedOrigins.includes(origin));
+    },
   })
 );
 app.use(express.json());
