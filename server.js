@@ -12,7 +12,7 @@ const port = process.env.PORT || 3000;
 
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:5173",
+    origin: process.env.CLIENT_ORIGIN || "https://next-calculates-dmrc-fare.netlify.app",
   })
 );
 app.use(express.json());
