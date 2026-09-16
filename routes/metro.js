@@ -6,6 +6,7 @@ import {
   fallbackLineStations,
   fallbackStationDetail,
   fallbackStationSearch,
+  fallbackMapData,
 } from '../services/metroSnapshot.js';
 import { planOfflineJourney } from '../services/metroJourneyPlanner.js';
 
@@ -42,6 +43,15 @@ router.get('/stations/search', proxyWithFallback(
   (req) => `/station_by_keyword/all/${encodeURIComponent(req.query.q || '')}`,
   (req) => fallbackStationSearch(req.query.q || '')
 ));
+
+// Schematic map coordinates for every station, sourced only from the local
+// snapshot (DMRC's own diagram x/y positions - geometry doesn't change, and
+// there's no live bulk-coordinates endpoint to prefer over it).
+router.get('/map', (req, res) => {
+  const data = fallbackMapData();
+  if (!data) return res.status(502).json({ message: 'Map data unavailable' });
+  return res.json(data);
+});
 
 router.get('/stations/:code', proxyWithFallback(
   (req) => `/station/${encodeURIComponent(req.params.code)}`,

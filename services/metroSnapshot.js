@@ -45,6 +45,36 @@ export const fallbackStationSearch = (q) => {
   return out;
 };
 
+// Bulk coordinates for every station + per-line station order, for drawing
+// a schematic map at DMRC's own diagram scale. Snapshot-only (no live
+// upstream equivalent returns coordinates in bulk) - geometry doesn't change,
+// so this is safe to always serve from the committed snapshot.
+export const fallbackMapData = () => {
+  load();
+  if (!snapshot) return null;
+
+  const stations = Object.values(snapshot.stations || {}).map((s) => ({
+    station_code: s.station_code,
+    station_name: s.station_name,
+    x_coords: s.x_coords,
+    y_coords: s.y_coords,
+    interchange: s.interchange,
+  }));
+  const lines = (snapshot.lines || []).map((l) => ({
+    line_code: l.line_code,
+    line_color: l.line_color,
+    primary_color_code: l.primary_color_code,
+  }));
+  const stationsByLine = Object.fromEntries(
+    Object.entries(snapshot.stationsByLine || {}).map(([lc, list]) => [
+      lc,
+      list.map((s) => s.station_code),
+    ])
+  );
+
+  return { lines, stations, stationsByLine };
+};
+
 // Keep the search result slim like the live endpoint.
 const validateSearch = (s) => ({
   id: s.id,
