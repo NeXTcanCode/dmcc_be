@@ -83,6 +83,16 @@ router.put('/:id/confirm', async (req, res) => {
   }
 });
 
+// Clears history only: pending trips are still unpaid, so they are kept.
+router.delete('/', async (req, res) => {
+  try {
+    const result = await Trip.deleteMany({ userId: req.user.id, status: { $ne: 'pending' } });
+    return res.json({ deletedCount: result.deletedCount || 0 });
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not clear trip history', detail: error.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     const deleted = await Trip.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
