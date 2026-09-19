@@ -7,7 +7,7 @@ import Wallet from '../models/Wallet.js';
 const router = Router();
 
 const signToken = (user) =>
-  jwt.sign({ sub: user._id.toString(), email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+  jwt.sign({ sub: user._id.toString(), email: user.email }, process.env.JWT_SECRET);
 
 router.post('/register', async (req, res) => {
   try {
