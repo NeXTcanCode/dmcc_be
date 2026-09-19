@@ -142,6 +142,43 @@ router.post('/debit', async (req, res) => {
   }
 });
 
+// The user read their real card balance at a gate or station machine: set the
+// wallet to it and log the difference as a correction.
+router.post('/correct', async (req, res) => {
+  try {
+    const { balance } = req.body;
+    if (typeof balance !== 'number' || !Number.isFinite(balance) || balance < 0 || balance > MAX_BALANCE) {
+      return res.status(400).json({ message: `balance must be between 0 and ${MAX_BALANCE}` });
+    }
+
+    const before = await Wallet.findOneAndUpdate(
+      { userId: req.user.id },
+      { $set: { currentBalance: balance, lastUpdated: new Date() } },
+      { new: false }
+    );
+    if (!before) return res.status(404).json({ message: 'Wallet not found' });
+
+    const diff = Math.round((balance - before.currentBalance) * 100) / 100;
+    if (diff !== 0) {
+      await WalletLog.create({
+        userId: req.user.id,
+        type: diff > 0 ? 'recharge' : 'deduction',
+        amount: Math.abs(diff),
+        note: 'balance_correction'
+      });
+    }
+
+    return res.json({
+      currentBalance: balance,
+      difference: diff,
+      maxBalance: MAX_BALANCE,
+      remainingCapacity: Math.max(0, MAX_BALANCE - balance)
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not correct wallet balance', detail: error.message });
+  }
+});
+
 router.get('/logs', async (req, res) => {
   try {
     // Auto-clear logs older than retention window on each logs read.
