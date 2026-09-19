@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { calculateDMRCFare } from '../services/fareCalculator.js';
 import { resolveFare } from '../services/externalFareService.js';
 import { autoConfirmExpiredTrips } from '../services/tripAutoConfirm.js';
+import { chargeTrip } from '../services/tripCharge.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -62,12 +63,19 @@ router.post('/pending', async (req, res) => {
 
 router.put('/:id/confirm', async (req, res) => {
   try {
-    const trip = await Trip.findOne({ _id: req.params.id, userId: req.user.id });
-    if (!trip) return res.status(404).json({ message: 'Trip not found' });
-    if (trip.status !== 'pending') return res.status(400).json({ message: 'Only pending trip can be confirmed' });
-
-    trip.status = 'confirmed';
-    await trip.save();
+    const result = await chargeTrip({ tripId: req.params.id, userId: req.user.id });
+    if (!result.ok && result.reason === 'insufficient') {
+      return res.status(400).json({
+        message: `Insufficient wallet balance: fare is INR ${result.fare}, balance is INR ${result.balance}. Recharge and confirm again.`
+      });
+    }
+    if (!result.ok) {
+      const exists = await Trip.exists({ _id: req.params.id, userId: req.user.id });
+      return exists
+        ? res.status(400).json({ message: 'Only pending trip can be confirmed' })
+        : res.status(404).json({ message: 'Trip not found' });
+    }
+    const trip = result.trip;
 
     return res.json(trip);
   } catch (error) {
